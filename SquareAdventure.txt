@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calfis Art</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #info, #menu, #instructions, #countdown, #gameOver, #controls, #leaderboard {
+            position: absolute;
+            color: white;
+            z-index: 100;
+        }
+        #info {
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+        }
+        #menu {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            text-align: center;
+        }
+        #instructions {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        #countdown {
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 64px;
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 3px solid white;
+        }
+        #gameOver {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 64px;
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 3px solid red;
+        }
+        #controls {
+            bottom: 10px;
+            left: 10px;
+            display: none;
+        }
+        .control-button {
+            width: 60px;
+            height: 60px;
+            margin: 5px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 2px solid white;
+            border-radius: 50%;
+            font-size: 24px;
+            color: white;
+            text-align: center;
+            line-height: 60px;
+            cursor: pointer;
+            user-select: none;
+        }
+        #leaderboard {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <div>Score: <span id="score">0</span></div>
+        <div>Time: <span id="time">0</span>s</div>
+        <div>Lives: <span id="lives">3</span></div>
+    </div>
+    <div id="menu">
+        <h1>Calfis Art</h1>
+        <button id="startButton">Start Game</button>
+        <button id="startMobileButton">Play on Mobile</button>
+        <button id="instructionsButton">Instructions</button>
+        <button id="leaderboardButton">Leaderboard</button>
+        <button id="restartButton" style="display: none;">Restart Game</button>
+    </div>
+    <div id="instructions">
+        <h2>Instructions</h2>
+        <p>Use the arrow keys or touch the screen to move the player. Avoid obstacles and reach the goal to score points.</p>
+        <button id="closeInstructionsButton">Close</button>
+    </div>
+    <div id="countdown">3</div>
+    <div id="gameOver">Game Over</div>
+    <div id="leaderboard">
+        <h2>Leaderboard</h2>
+        <ol id="leaderboardList"></ol>
+        <button id="closeLeaderboardButton">Close</button>
+    </div>
+    <div id="controls">
+        <div class="control-button" id="upButton">↑</div>
+        <div class="control-button" id="leftButton">←</div>
+        <div class="control-button" id="downButton">↓</div>
+        <div class="control-button" id="rightButton">→</div>
+    </div>
+    <audio id="collisionSound" src="collision.mp3"></audio>
+    <audio id="goalSound" src="goal.mp3"></audio>
+    <audio id="loseLifeSound" src="lose_life.mp3"></audio>
+    <audio id="gameOverSound" src="game_over.mp3"></audio>
+    <audio id="backgroundMusic" src="https://www.bensound.com/bensound-music/bensound-creativeminds.mp3" loop autoplay></audio>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Configuración de la escena
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Fondo de cielo azul
+        scene.background = new THREE.Color(0x87CEEB);
+
+        // Luz
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 10, 7.5);
+        scene.add(light);
+
+        // Sol
+        const sunGeometry = new THREE.CircleGeometry(5, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        sun.position.set(-10, 10, -30);
+        scene.add(sun);
+
+        // Nubes
+        const clouds = [];
+        function createCloud() {
+            const cloudGeometry = new THREE.BoxGeometry(3, 1, 1);
+            const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+            const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+            cloud.position.set(Math.random() * 40 - 20, Math.random() * 10 + 10, -30);
+            clouds.push(cloud);
+            scene.add(cloud);
+            return cloud;
+        }
+
+        for (let i = 0; i < 5; i++) {
+            createCloud();
+        }
+
+        // Jugador
+        const playerGeometry = new THREE.BoxGeometry();
+        const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x00008B });  // Azul oscuro
+        const player = new THREE.Mesh(playerGeometry, playerMaterial);
+        scene.add(player);
+
+        // Suelo
+        const floorGeometry = new THREE.PlaneGeometry(200, 200);
+        const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = - Math.PI / 2;
+        floor.position.y = -1;
+        scene.add(floor);
+
+        // Obstáculos
+        const obstacleGeometry = new THREE.BoxGeometry();
+        const obstacleMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+        const goalMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+
+        const obstacles = [];
+
+        // Background
+        const backgroundGeometry = new THREE.PlaneGeometry(200, 200);
+        const backgroundMaterial = new THREE.MeshLambertMaterial({ color: 0x87CEEB, side: THREE.DoubleSide });
+        const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+        background.rotation.x = -Math.PI / 2;
+        background.position.y = -5;
+        scene.add(background);
+
+        camera.position.z = 5;
+
+        let playerSpeed = 0.05;
+        let obstacleSpeed = 0.1;
+        let moveDirection = { x: 0, z: 0 };
+        let score = 0;
+        let time = 0;
+        let lives = 3;
+        let gameInterval;
+        let obstacleInterval;
+        const leaderboard = [];
+
+        function animate() {
+            if (lives > 0) {
+                requestAnimationFrame(animate);
+            }
+
+            // Movimiento del jugador
+            player.position.x += moveDirection.x * playerSpeed;
+            player.position.z += moveDirection.z * playerSpeed;
+
+            // Limitar el movimiento del jugador dentro de los límites
+            player.position.x = Math.max(Math.min(player.position.x, 10), -10);
+            player.position.z = Math.max(Math.min(player.position.z, 10), -10);
+
+            // Movimiento del fondo
+            background.position.z += 0.1;
+
+            if (background.position.z > 100) {
+                background.position.z = 0;
+            }
+
+            // Movimiento de nubes
+            clouds.forEach(cloud => {
+                cloud.position.x += 0.01;
+                if (cloud.position.x > 20) {
+                    cloud.position.x = -20;
+                    cloud.position.y = Math.random() * 10 + 10;
+                    cloud.visible = Math.random() > 0.5;
+                }
+            });
+
+            // Movimiento de obstáculos
+            obstacles.forEach(obstacle => {
+                obstacle.position.z += obstacleSpeed;
+                if (obstacle.position.distanceTo(player.position) < 1) {
+                    if (obstacle.material.color.getHex() === goalMaterial.color.getHex()) {
+                        score += 10;
+                        document.getElementById('score').innerText = score;
+                        document.getElementById('goalSound').play();
+                        resetGame();
+                    } else {
+                        document.getElementById('loseLifeSound').play();
+                        lives -= 1;
+                        document.getElementById('lives').innerText = lives;
+                        if (lives <= 0) {
+                            document.getElementById('gameOverSound').play();
+                            document.getElementById('gameOver').style.display = 'block';
+                            clearInterval(obstacleInterval);
+                            clearInterval(gameInterval);
+                            updateLeaderboard(score);
+                        } else {
+                            resetGame();
+                        }
+                    }
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function movePlayer(event) {
+            switch (event.key) {
+                case 'ArrowUp':
+                    moveDirection.z = -1;
+                    break;
+                case 'ArrowDown':
+                    moveDirection.z = 1;
+                    break;
+                case 'ArrowLeft':
+                    moveDirection.x = -1;
+                    break;
+                case 'ArrowRight':
+                    moveDirection.x = 1;
+                    break;
+            }
+        }
+
+        function stopPlayer(event) {
+            switch (event.key) {
+                case 'ArrowUp':
+                case 'ArrowDown':
+                    moveDirection.z = 0;
+                    break;
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                    moveDirection.x = 0;
+                    break;
+            }
+        }
+
+        function touchStart(event) {
+            const touch = event.touches[0];
+            const x = touch.clientX;
+            const y = touch.clientY;
+            if (y < window.innerHeight / 2) {
+                moveDirection.z = -1;
+            } else if (y > window.innerHeight / 2) {
+                moveDirection.z = 1;
+            }
+            if (x < window.innerWidth / 2) {
+                moveDirection.x = -1;
+            } else if (x > window.innerWidth / 2) {
+                moveDirection.x = 1;
+            }
+        }
+
+        function touchEnd(event) {
+            moveDirection = { x: 0, z: 0 };
+        }
+
+        window.addEventListener('keydown', movePlayer);
+        window.addEventListener('keyup', stopPlayer);
+
+        function activateMobileControls() {
+            document.getElementById('upButton').addEventListener('touchstart', () => { moveDirection.z = -1; });
+            document.getElementById('upButton').addEventListener('touchend', () => { moveDirection.z = 0; });
+            document.getElementById('leftButton').addEventListener('touchstart', () => { moveDirection.x = -1; });
+            document.getElementById('leftButton').addEventListener('touchend', () => { moveDirection.x = 0; });
+            document.getElementById('downButton').addEventListener('touchstart', () => { moveDirection.z = 1; });
+            document.getElementById('downButton').addEventListener('touchend', () => { moveDirection.z = 0; });
+            document.getElementById('rightButton').addEventListener('touchstart', () => { moveDirection.x = 1; });
+            document.getElementById('rightButton').addEventListener('touchend', () => { moveDirection.x = 0; });
+
+            window.addEventListener('touchstart', touchStart);
+            window.addEventListener('touchend', touchEnd);
+        }
+
+        function resetGame() {
+            player.position.set(0, 0, 0);
+            obstacles.forEach(obstacle => {
+                obstacle.position.set(
+                    Math.random() * 20 - 10,
+                    0,
+                    Math.random() * -20 - 10
+                );
+            });
+        }
+
+        function updateTime() {
+            time += 1;
+            document.getElementById('time').innerText = time;
+            // Incrementar la dificultad cada 10 segundos
+            if (time % 10 === 0) {
+                obstacleSpeed += 0.05;
+                clearInterval(obstacleInterval);
+                obstacleInterval = setInterval(addObstacle, Math.max(500, 2000 - time * 10));
+            }
+        }
+
+        function startGame(isMobile = false) {
+            document.getElementById('countdown').style.display = 'block';
+            let countdown = 3;
+            document.getElementById('countdown').innerText = countdown;
+
+            const countdownInterval = setInterval(() => {
+                countdown -= 1;
+                document.getElementById('countdown').innerText = countdown;
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById('countdown').style.display = 'none';
+                    gameInterval = setInterval(updateTime, 1000);
+                    obstacleInterval = setInterval(addObstacle, 2000);
+                    document.getElementById('menu').style.display = 'none';
+                    document.getElementById('restartButton').style.display = 'block';
+                    document.getElementById('gameOver').style.display = 'none';
+                    document.getElementById('controls').style.display = isMobile ? 'block' : 'none';
+                    lives = 3;
+                    score = 0;
+                    time = 0;
+                    document.getElementById('lives').innerText = lives;
+                    document.getElementById('score').innerText = score;
+                    document.getElementById('time').innerText = time;
+                    animate();
+                    if (isMobile) {
+                        activateMobileControls();
+                    }
+                }
+            }, 1000);
+        }
+
+        function showInstructions() {
+            document.getElementById('instructions').style.display = 'block';
+        }
+
+        function closeInstructions() {
+            document.getElementById('instructions').style.display = 'none';
+        }
+
+        function showLeaderboard() {
+            const leaderboardList = document.getElementById('leaderboardList');
+            leaderboardList.innerHTML = '';
+            leaderboard.slice(0, 3).forEach((score, index) => {
+                const listItem = document.createElement('li');
+                listItem.innerText = `#${index + 1}: ${score}`;
+                leaderboardList.appendChild(listItem);
+            });
+            document.getElementById('leaderboard').style.display = 'block';
+        }
+
+        function closeLeaderboard() {
+            document.getElementById('leaderboard').style.display = 'none';
+        }
+
+        function updateLeaderboard(score) {
+            leaderboard.push(score);
+            leaderboard.sort((a, b) => b - a);
+        }
+
+        document.getElementById('startButton').addEventListener('click', () => startGame(false));
+        document.getElementById('startMobileButton').addEventListener('click', () => startGame(true));
+        document.getElementById('restartButton').addEventListener('click', () => startGame(false));
+        document.getElementById('instructionsButton').addEventListener('click', showInstructions);
+        document.getElementById('closeInstructionsButton').addEventListener('click', closeInstructions);
+        document.getElementById('leaderboardButton').addEventListener('click', showLeaderboard);
+        document.getElementById('closeLeaderboardButton').addEventListener('click', closeLeaderboard);
+
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        document.getElementById('menu').style.display = 'block';
+
+        function playBackgroundMusic() {
+            const music = document.getElementById('backgroundMusic');
+            music.play();
+        }
+
+        playBackgroundMusic();
+
+        function addObstacle() {
+            const obstacle = new THREE.Mesh(obstacleGeometry, Math.random() < 0.1 ? goalMaterial : obstacleMaterial);
+            obstacle.position.set(
+                Math.random() * 20 - 10,
+                0,
+                Math.random() * -20 - 10
+            );
+            obstacles.push(obstacle);
+            scene.add(obstacle);
+        }
+
+    </script>
+</body>
+</html>
